@@ -1,13 +1,12 @@
 # yaml-language-server: $schema=./quartz/plugins/quartz-plugins.schema.json
 configuration:
-  pageTitle: Quartz 5
+  pageTitle: "📝 ملاحظات فارس"
   pageTitleSuffix: ""
   enableSPA: true
   enablePopovers: true
-  analytics:
-    provider: plausible
-  locale: en-US
-  baseUrl: quartz.jzhao.xyz
+  analytics: null # TODO: decide GA vs Cloudflare after Zaraz check
+  locale: ar-SA
+  baseUrl: crystalized-thoughts.pages.dev
   ignorePatterns:
     - private
     - templates
@@ -44,7 +43,7 @@ plugins:
   - source: "@quartz-community/created-modified-date"
     enabled: true
     options:
-      defaultDateType: modified
+      defaultDateType: created
       priority:
         - frontmatter
         - git
@@ -108,7 +107,7 @@ plugins:
   - source: "@quartz-community/remove-draft"
     enabled: true
   - source: "@quartz-community/explicit-publish"
-    enabled: false
+    enabled: true # CRITICAL: only notes with `publish: true` are built. Never set false.
   - source: "@quartz-community/alias-redirects"
     enabled: true
   - source: "@quartz-community/content-index"
@@ -202,14 +201,12 @@ plugins:
   - source: "@quartz-community/footer"
     enabled: true
     options:
-      links:
-        GitHub: https://github.com/jackyzha0/quartz
-        Discord Community: https://discord.gg/cRFFHYye7t
+      links: {} # TODO: add personal links
     layout:
       position: footer
       priority: 50
   - source: "@quartz-community/recent-notes"
-    enabled: false
+    enabled: true
   - source: "@quartz-community/spacer"
     enabled: true
     options: {}
