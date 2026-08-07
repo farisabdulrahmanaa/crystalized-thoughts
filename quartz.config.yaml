@@ -1,10 +1,10 @@
 # yaml-language-server: $schema=./quartz/plugins/quartz-plugins.schema.json
 configuration:
-  pageTitle: "📝 ملاحظات فارس"
+  pageTitle: 📝 ملاحظات فارس
   pageTitleSuffix: ""
   enableSPA: true
   enablePopovers: true
-  analytics: null # TODO: decide GA vs Cloudflare after Zaraz check
+  analytics: null
   locale: ar-SA
   baseUrl: crystalized-thoughts.pages.dev
   ignorePatterns:
@@ -107,7 +107,7 @@ plugins:
   - source: "@quartz-community/remove-draft"
     enabled: true
   - source: "@quartz-community/explicit-publish"
-    enabled: true # CRITICAL: only notes with `publish: true` are built. Never set false.
+    enabled: true
   - source: "@quartz-community/alias-redirects"
     enabled: true
   - source: "@quartz-community/content-index"
@@ -201,7 +201,7 @@ plugins:
   - source: "@quartz-community/footer"
     enabled: true
     options:
-      links: {} # TODO: add personal links
+      links: {}
     layout:
       position: footer
       priority: 50
@@ -254,6 +254,13 @@ plugins:
       position: afterBody
       priority: 50
       display: all
+  - source:
+      name: quartz-themes
+      repo: github:saberzero1/quartz-themes
+      subdir: plugin
+    enabled: true
+    order: 50
+    options: {}
 layout:
   groups:
     toolbar:
