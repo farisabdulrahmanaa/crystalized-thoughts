@@ -95,3 +95,17 @@
     }
   }
 }
+
+// ============================================================================
+// Accessibility: search placeholder contrast
+// ============================================================================
+// Lighthouse flagged the search placeholder at 1.87:1 (needs 4.5:1). Darkening
+// the `gray` token to #6f6e6e (4.80:1 as a pure colour) was not enough on its
+// own: the UA stylesheet applies a default opacity to ::placeholder, so it
+// rendered as rgb(117,117,117) = 4.35:1 — measured live, still failing.
+// `opacity: 1` makes it render the token colour it was assigned.
+input::placeholder,
+.search input::placeholder {
+  color: var(--gray);
+  opacity: 1;
+}
