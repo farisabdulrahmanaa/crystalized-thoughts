@@ -1,3 +1,75 @@
 @use "./variables.scss" as *;
 
-// put your custom CSS here!
+// ============================================================================
+// RTL / mobile layout fix
+// ============================================================================
+//
+// ROOT CAUSE
+// The mobile explorer is an off-canvas drawer. The plugin parks it off-screen
+// with hard-coded PHYSICAL geometry:
+//     .explorer .explorer-content {
+//       position: absolute; left: 0; width: 100vw; height: 100dvh;
+//       transform: translateX(-100vw);            // parked
+//     }
+//     .explorer:not(.collapsed) > .explorer-content { transform: translateX(0); }
+//     .page > #quartz-body.lock-scroll > :not(.sidebar.left:has(.explorer)) {
+//       transform: translateX(100dvw);            // push page away
+//     }
+// In LTR, -100vw parks the drawer past the inline-START edge, which browsers
+// do NOT add to the scrollable overflow region — it is simply unreachable.
+// In RTL the inline axis is mirrored: inline-start is on the RIGHT, so -100vw
+// now parks a full-viewport-wide, full-height element in the inline-END
+// direction, which DOES extend scrollable overflow. Result: the document
+// becomes ~2 viewports wide, producing the dead region, the horizontal
+// scrollbar, the right-shifted header, and the clipped explorer text.
+// `visibility: hidden` does not exempt it — hidden boxes still contribute to
+// scrollable overflow.
+//
+// Upstream jackyzha0/quartz v5 has ZERO `[dir="rtl"]` selectors in any .scss
+// or .tsx, and no issue/PR addresses this. Upgrading does not fix it.
+
+// ----------------------------------------------------------------------------
+// FIX 1 (primary, direction-agnostic)
+// base.scss:10 sets `overflow-x: hidden` on <html>. `hidden` still makes the
+// viewport a scroll CONTAINER — the overflow area is reserved and reachable,
+// it just has no visible scrollbar chrome. `clip` creates no scroll container
+// at all, so off-canvas content contributes nothing to scrollable overflow.
+// It is also the sticky-safe variant: unlike `hidden`, `overflow-x: clip` does
+// not turn ancestors into scroll containers, so the `position: sticky`
+// sidebars keep working.
+// This alone should resolve symptoms 1, 3 and 4 in both directions.
+// ----------------------------------------------------------------------------
+html {
+  overflow-x: clip;
+}
+
+// ----------------------------------------------------------------------------
+// FIX 2 (RTL + mobile only — zero effect on LTR or on any viewport > 800px)
+// Mirror the drawer so it parks on the inline-start (unreachable) side and
+// animates in from the correct edge. `inset-inline: 0` + `width: auto` also
+// removes a real ~16px overflow: the drawer is `left: 0; width: 100vw` inside
+// a sidebar that is already inset by #quartz-body's `padding: 0 1rem`, so it
+// was 32px wider than its container.
+// ----------------------------------------------------------------------------
+@media all and ($mobile) {
+  [dir="rtl"] {
+    .explorer .explorer-content {
+      inset-inline: 0;
+      width: auto;
+      max-width: none;
+      transform: translateX(100vw);
+    }
+
+    .explorer.collapsed > .explorer-content {
+      transform: translateX(100vw);
+    }
+
+    .explorer:not(.collapsed) > .explorer-content {
+      transform: translateX(0);
+    }
+
+    .page > #quartz-body.lock-scroll > :not(.sidebar.left:has(.explorer)) {
+      transform: translateX(-100dvw);
+    }
+  }
+}
