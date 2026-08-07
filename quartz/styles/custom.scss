@@ -5,54 +5,68 @@
 // ============================================================================
 //
 // ROOT CAUSE
-// The mobile explorer is an off-canvas drawer. The plugin parks it off-screen
-// with hard-coded PHYSICAL geometry:
+// The mobile explorer is an off-canvas drawer. @quartz-community/explorer parks
+// it off-screen with hard-coded PHYSICAL geometry (verified in the shipped,
+// precompiled CSS — component-1ea6ad18.css):
 //     .explorer .explorer-content {
-//       position: absolute; left: 0; width: 100vw; height: 100dvh;
-//       transform: translateX(-100vw);            // parked
+//       position: absolute; left: 0; width: 100vw; max-width: 100vw;
+//       height: 100dvh; visibility: hidden; transform: translateX(-100vw);
 //     }
 //     .explorer:not(.collapsed) > .explorer-content { transform: translateX(0); }
-//     .page > #quartz-body.lock-scroll > :not(.sidebar.left:has(.explorer)) {
-//       transform: translateX(100dvw);            // push page away
-//     }
-// In LTR, -100vw parks the drawer past the inline-START edge, which browsers
-// do NOT add to the scrollable overflow region — it is simply unreachable.
+// In LTR, -100vw parks the drawer past the inline-START edge, which browsers do
+// NOT add to the scrollable overflow region — it is simply unreachable.
 // In RTL the inline axis is mirrored: inline-start is on the RIGHT, so -100vw
-// now parks a full-viewport-wide, full-height element in the inline-END
-// direction, which DOES extend scrollable overflow. Result: the document
-// becomes ~2 viewports wide, producing the dead region, the horizontal
-// scrollbar, the right-shifted header, and the clipped explorer text.
-// `visibility: hidden` does not exempt it — hidden boxes still contribute to
-// scrollable overflow.
+// now parks a viewport-sized, full-height box in the inline-END direction,
+// which DOES extend scrollable overflow. The document becomes ~2 viewports
+// wide, producing the dead region, the horizontal scrollbar, the shifted
+// header and the clipped explorer text. `visibility: hidden` does not exempt
+// it — hidden boxes still contribute to scrollable overflow.
 //
-// Upstream jackyzha0/quartz v5 has ZERO `[dir="rtl"]` selectors in any .scss
-// or .tsx, and no issue/PR addresses this. Upgrading does not fix it.
+// Upstream jackyzha0/quartz v5 has ZERO `[dir="rtl"]` selectors in any .scss or
+// .tsx, and no issue/PR addresses this. Upgrading does not fix it.
+//
+// custom.scss is emitted OUTSIDE the `quartz-base` cascade layer, so unlayered
+// rules here beat every layered rule regardless of specificity — no
+// !important needed, and no `.collapsed` counterpart rule needed either (see
+// note below).
+//
+// ----------------------------------------------------------------------------
+// WHAT CHANGED vs. the previous version of this file, and why
+// ----------------------------------------------------------------------------
+// Two rules were REMOVED after A/B testing four real builds in headless
+// Chromium at 360/412/480/768/1024/1440 px, RTL and LTR, light and dark:
+//
+//  1. `html { overflow-x: clip }` — REMOVED. It was inert. A build carrying
+//     ONLY this rule (no RTL block) still overflowed by exactly as much as a
+//     build with no custom CSS at all: scrollWidth 808 vs clientWidth 412, and
+//     window.scrollX reached -396 — i.e. the page was still genuinely
+//     horizontally scrollable. The root element's overflow propagates to the
+//     viewport, so `clip` on <html> did not contain the off-canvas drawer. It
+//     also changed html's computed overflow-y from `auto` to `visible`, which
+//     is a gratuitous side effect for zero benefit. The RTL block below fixes
+//     the overflow at its source, so nothing is left for a clip to catch.
+//
+//  2. `.explorer.collapsed > .explorer-content { transform: translateX(100vw) }`
+//     — REMOVED as redundant. Because this file is unlayered, the
+//     `.explorer .explorer-content` rule below already overrides the layered
+//     `.explorer.collapsed > .explorer-content` rule from the plugin, despite
+//     having lower specificity. Verified: a build without it is identical on
+//     every measurement (drawer parked at left:428, opens to left:16 /
+//     width:380, recloses to 428, zero overflow at every viewport).
+// ----------------------------------------------------------------------------
 
-// ----------------------------------------------------------------------------
-// FIX 1 (primary, direction-agnostic)
-// base.scss:10 sets `overflow-x: hidden` on <html>. `hidden` still makes the
-// viewport a scroll CONTAINER — the overflow area is reserved and reachable,
-// it just has no visible scrollbar chrome. `clip` creates no scroll container
-// at all, so off-canvas content contributes nothing to scrollable overflow.
-// It is also the sticky-safe variant: unlike `hidden`, `overflow-x: clip` does
-// not turn ancestors into scroll containers, so the `position: sticky`
-// sidebars keep working.
-// This alone should resolve symptoms 1, 3 and 4 in both directions.
-// ----------------------------------------------------------------------------
-html {
-  overflow-x: clip;
-}
-
-// ----------------------------------------------------------------------------
-// FIX 2 (RTL + mobile only — zero effect on LTR or on any viewport > 800px)
-// Mirror the drawer so it parks on the inline-start (unreachable) side and
-// animates in from the correct edge. `inset-inline: 0` + `width: auto` also
-// removes a real ~16px overflow: the drawer is `left: 0; width: 100vw` inside
-// a sidebar that is already inset by #quartz-body's `padding: 0 1rem`, so it
-// was 32px wider than its container.
-// ----------------------------------------------------------------------------
 @media all and ($mobile) {
   [dir="rtl"] {
+    // Mirror the parked position. `translateX(100vw)` pushes the drawer past
+    // the RTL inline-start edge (the right), which is outside the scrollable
+    // overflow region — so it costs no document width, exactly as the
+    // untouched -100vw does in LTR.
+    //
+    // `inset-inline: 0` + `width: auto` additionally removes a real ~16px
+    // overflow that exists in LTR too: the drawer is `left: 0; width: 100vw`
+    // inside a sidebar that #quartz-body has already inset by `padding: 0 1rem`,
+    // making it 32px wider than its containing block. Logical insets let it
+    // size to the container instead of the viewport.
     .explorer .explorer-content {
       inset-inline: 0;
       width: auto;
@@ -60,14 +74,22 @@ html {
       transform: translateX(100vw);
     }
 
-    .explorer.collapsed > .explorer-content {
-      transform: translateX(100vw);
-    }
-
+    // Slide it in from the mirrored edge. Needed because the rule above now
+    // wins over the plugin's parked transform in ALL states, including the
+    // open one, so the open state has to be re-stated here.
     .explorer:not(.collapsed) > .explorer-content {
       transform: translateX(0);
     }
 
+    // Mirror the "push the page away" transform that pairs with the drawer.
+    //
+    // NOTE: this rule currently never matches — the shipped explorer JS adds
+    // `mobile-no-scroll` to <body>, never `lock-scroll` to #quartz-body, so the
+    // plugin's own `.lock-scroll` rule is dormant too. It is kept deliberately:
+    // upstream still ships the `.lock-scroll { transform: translateX(100dvw) }`
+    // rule, and if any code path revives it, the unmirrored version would shove
+    // the page the wrong way in RTL and reintroduce the overflow this file
+    // exists to fix. Zero cost while dormant.
     .page > #quartz-body.lock-scroll > :not(.sidebar.left:has(.explorer)) {
       transform: translateX(-100dvw);
     }
