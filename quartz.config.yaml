@@ -4,7 +4,12 @@ configuration:
   pageTitleSuffix: ""
   enableSPA: true
   enablePopovers: true
-  analytics: null
+  # GA4 was inline in the old build (NOT Zaraz-injected - verified 2026-08-07).
+  # Cloudflare Web Analytics runs alongside at the dashboard level.
+  # Quartz cannot emit the GTM container (GTM-NWL2BDRJ); GA4 only.
+  analytics:
+    provider: google
+    tagId: G-W5SM5X7ESC
   locale: ar-SA
   baseUrl: crystalized-thoughts.pages.dev
   ignorePatterns:
