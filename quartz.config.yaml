@@ -141,6 +141,12 @@ plugins:
       priority: 50
   - source: "@quartz-community/graph"
     enabled: true
+    options:
+      localGraph:
+        depth: -1
+        scale: 0.9
+        enableRadial: true
+        focusOnHover: true
     layout:
       position: right
       priority: 10
