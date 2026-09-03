@@ -86,7 +86,7 @@ plugins:
     enabled: true
     order: 70
   - source: "@quartz-community/latex"
-    enabled: true
+    enabled: false
     options:
       renderEngine: katex
     order: 80
@@ -103,7 +103,7 @@ plugins:
     enabled: false
     order: 92
   - source: "@quartz-community/quartz-fonts"
-    enabled: true
+    enabled: false
   - source: "@quartz-themes/core"
     enabled: false
     options:
