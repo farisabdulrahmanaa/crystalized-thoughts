@@ -109,3 +109,133 @@ input::placeholder,
   color: var(--gray);
   opacity: 1;
 }
+
+// ============================================================================
+// Accessibility: selected-text contrast (::selection)
+// ============================================================================
+// Quartz paints ::selection as `color-mix(in srgb, var(--tertiary) 60%, #fff0)`
+// with `color: var(--darkgray)`. Computed against the composited background:
+//   light, tertiary #84a59d (old): 4.67:1  — passed by a hair
+//   light, tertiary #57766e (new): 3.42:1  — would FAIL AA
+//   dark,  tertiary #84a59d      : 3.78:1  — ALREADY FAILING, pre-existing
+// Switching the selected-text colour from --darkgray to --dark clears both:
+//   light 5.82:1, dark 4.70:1. One rule, both themes, no [saved-theme] scoping.
+// (Computed from the token values; contrast.mjs cannot render a text selection.)
+::selection {
+  color: var(--dark);
+}
+
+// ============================================================================
+// RTL chrome mirroring — breadcrumbs, fold icons, indent guides, sidebar
+// ============================================================================
+//
+// Text direction is already correct (`dir="rtl"` is emitted). The CHROME is not:
+// upstream Quartz v5 and every @quartz-community/* plugin ship PHYSICAL
+// left/right geometry with zero `[dir="rtl"]` selectors (verified: no `:dir()`
+// anywhere, and the only pre-existing logical properties in the tree are the
+// checkbox margins in base.scss).
+//
+// STRATEGY. Two different tools, used deliberately:
+//
+//  1. CSS LOGICAL PROPERTIES for anything on the inline axis. These are the
+//     right fix because they are direction-agnostic: the same declaration is a
+//     no-op in LTR and correct in RTL, so nothing needs a `[dir]` guard and LTR
+//     rendering is provably unchanged. Baseline-available since 2017-2020 across
+//     Chrome/Edge/Firefox/Safari — MDN "CSS logical properties and values":
+//     https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_logical_properties_and_values
+//     Spec: https://www.w3.org/TR/css-logical-1/
+//
+//     Note the SHORTHAND is load-bearing. `margin-inline-start` alone is NOT
+//     enough: logical properties resolve to a physical property, so in RTL
+//     `margin-inline-start` sets margin-RIGHT and the plugin's layered
+//     `margin-left` survives untouched, giving a margin on BOTH sides. The
+//     two-value shorthand (`margin-inline: <start> <end>`) resolves to both
+//     physical sides in either direction and therefore fully overrides.
+//
+//  2. `[dir="rtl"]` OVERRIDES only where no logical property exists.
+//     `transform: rotate()` has no direction-aware form — CSS rotation angles
+//     are absolute (https://www.w3.org/TR/css-transforms-1/#funcdef-transform-rotate),
+//     so a mirrored chevron needs an explicit opposite-sign rule.
+//
+// This file is emitted OUTSIDE the `quartz-base` cascade layer, so unlayered
+// rules here beat every layered plugin rule regardless of specificity. No
+// `!important` is needed anywhere below.
+//
+// MEASURED NEGATIVE RESULT — the breadcrumb arrow needs NO fix.
+// @quartz-community/breadcrumbs renders `spacerSymbol: "\276F"` (❯) as a real
+// DOM text node. U+276F has Unicode Bidi_Mirrored=Yes, so UAX #9 rule L4
+// (https://www.unicode.org/reports/tr9/#L4) makes the browser paint the mirrored
+// glyph automatically once the character resolves to R directionality — which it
+// does inside the RTL paragraph. Confirmed by screenshotting `.breadcrumb-container`
+// on an Arabic page: it already renders as ❮. DO NOT add `transform: scaleX(-1)`
+// or a `content:` swap here — that would double-mirror it back to wrong.
+// Only its MARGIN was on the wrong side.
+
+// --- Breadcrumbs: separator gap ------------------------------------------
+// `.breadcrumb-element p { margin: 0 0 0 .5rem }` — physical margin-left.
+.breadcrumb-element > p {
+  margin-block: 0;
+  margin-inline: 0.5rem 0;
+}
+
+// --- Fold chevrons: gap between label and icon ---------------------------
+// explorer: `.explorer .fold { margin-left: .5rem }`
+// toc:      `button.toc-header .fold { margin-left: .5rem }`
+// Both icons are the SECOND flex child, so flexbox already moves them to the
+// correct visual side; only the fixed physical margin fails to follow.
+.explorer .fold,
+button.toc-header .fold {
+  margin-inline: 0.5rem 0;
+}
+
+// `.folder-icon { margin-right: 5px }` — this icon is the FIRST child, so its
+// gap belongs on the inline-END side.
+.folder-icon {
+  margin-inline: 0 5px;
+}
+
+// --- Fold chevron ROTATION (no logical equivalent) -----------------------
+// Collapsed state is `transform: rotate(-90deg)`, which turns the down-chevron
+// to point toward the inline-end edge in LTR (i.e. right). In RTL inline-end is
+// the left, so the sign must flip. `rotate()` angles are absolute in CSS, so
+// this genuinely needs a `[dir]` guard.
+[dir="rtl"] {
+  .explorer.collapsed .fold,
+  button.toc-header.collapsed .fold,
+  li:has(> .folder-outer:not(.open)) > .folder-container > svg,
+  .callout.is-collapsed > .callout-title > .fold-callout-icon {
+    transform: rotate(90deg);
+  }
+}
+
+// --- Indent guides ------------------------------------------------------
+// Explorer nested list: `border-left: 1px solid var(--lightgray);
+// margin-left: 6px; padding-left: .8rem` — in RTL the whole guide rail sits on
+// the far side of the text it is supposed to be indenting from.
+.explorer-content .folder-outer > ul {
+  margin-inline: 6px 0;
+  padding-inline: 0.8rem 0;
+  border-left: none;
+  border-right: none;
+  border-inline-start: 1px solid var(--lightgray);
+}
+
+// Table of contents depth indentation: `.depth-N { padding-left: calc(1rem * N) }`.
+@for $i from 0 through 6 {
+  ul.toc-content .depth-#{$i} {
+    padding-inline: calc(1rem * #{$i}) 0;
+  }
+}
+
+// --- text-align: left → text-align: start --------------------------------
+// `start` is the direction-relative keyword; it is identical to `left` in LTR.
+// https://developer.mozilla.org/en-US/docs/Web/CSS/text-align#start
+// (`footer` measured as computed `text-align: left` on an RTL page — a real bug.
+// The explorer/TOC toggles are flex containers so this is belt-and-braces there.)
+footer,
+button.mobile-explorer,
+button.desktop-explorer,
+button.toc-header,
+.folder-container div > button {
+  text-align: start;
+}
